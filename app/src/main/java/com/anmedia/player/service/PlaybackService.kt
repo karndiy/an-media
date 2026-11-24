@@ -108,9 +108,14 @@ class PlaybackService : MediaSessionService() {
         exoPlayer.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioSessionIdChanged(eventTime: AnalyticsListener.EventTime, audioSessionId: Int) {
                 AudioEffectsController.attach(audioSessionId)
+                // One-shot: only the first session attach after process start should pull in the
+                // persisted EQ snapshot. Previously this was never cleared, so every later session
+                // change (i.e. practically every track) re-applied the stale startup preset/bands
+                // and silently clobbered any preset/band the user picked in the Equalizer screen.
                 pendingEqRestore?.let {
                     AudioEffectsController.restorePersistedState(it.levels, it.preset, it.enabled, it.preampMb)
                 }
+                pendingEqRestore = null
             }
 
             override fun onPlaybackStateChanged(eventTime: AnalyticsListener.EventTime, state: Int) {
