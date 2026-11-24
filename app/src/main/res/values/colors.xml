@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="winamp_metal_dark">#1A1D1A</color>
+    <color name="winamp_metal_light">#3A3F3A</color>
+    <color name="winamp_lcd_green">#00FF41</color>
+    <color name="winamp_lcd_amber">#FFB000</color>
+    <color name="winamp_accent">#58FF9C</color>
+</resources>

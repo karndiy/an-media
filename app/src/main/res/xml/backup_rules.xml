@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="database" path="an_media.db" />
+    <exclude domain="database" path="an_media.db-wal" />
+    <exclude domain="database" path="an_media.db-shm" />
+</full-backup-content>
