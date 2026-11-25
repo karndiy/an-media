@@ -20,16 +20,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anmedia.player.BuildConfig
-import com.anmedia.player.R
 import com.anmedia.player.ui.theme.LocalExtendedColors
 import com.anmedia.player.update.UpdateCheckState
 import com.anmedia.player.update.UpdateChecker
@@ -40,7 +42,18 @@ private const val REPO_URL = "https://github.com/karndiy/an-media"
 fun AboutDialog(onDismiss: () -> Unit) {
     val extended = LocalExtendedColors.current
     val context = LocalContext.current
+    val density = LocalDensity.current
     val updateState by UpdateChecker.state.collectAsStateWithLifecycle()
+
+    // painterResource(R.mipmap.ic_launcher) crashes at runtime on API 26+: the launcher icon is
+    // an <adaptive-icon> (mipmap-anydpi-v26/ic_launcher.xml), a drawable type painterResource
+    // doesn't support. Drawable.toBitmap() works for any Drawable, adaptive icons included.
+    val appIconBitmap = remember(context) {
+        val sizePx = with(density) { 48.dp.roundToPx() }
+        context.applicationInfo.loadIcon(context.packageManager)
+            .toBitmap(width = sizePx, height = sizePx)
+            .asImageBitmap()
+    }
 
     fun openUrl(url: String) {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -56,7 +69,7 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Image(
-                        painter = painterResource(R.mipmap.ic_launcher),
+                        bitmap = appIconBitmap,
                         contentDescription = null,
                         modifier = Modifier
                             .size(48.dp)
