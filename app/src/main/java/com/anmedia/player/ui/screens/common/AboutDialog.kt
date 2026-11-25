@@ -39,8 +39,6 @@ import com.anmedia.player.ui.theme.LocalExtendedColors
 import com.anmedia.player.update.UpdateCheckState
 import com.anmedia.player.update.UpdateChecker
 
-private const val REPO_URL = "https://github.com/karndiy/an-media"
-
 @Composable
 fun AboutDialog(onDismiss: () -> Unit) {
     val extended = LocalExtendedColors.current
@@ -67,9 +65,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
         title = { Text("About AnMedia") },
         text = {
             // AlertDialog's text slot doesn't scroll on its own, and this content (icon row,
-            // description, Updates section with variable-length release notes, two buttons) can
-            // overflow a real device's available height - without scroll, whatever overflows is
-            // just clipped, which is why "View source on GitHub" (the last item) could disappear.
+            // description, Updates section with variable-length release notes) can overflow a
+            // real device's available height - without scroll, whatever overflows is just clipped.
             Column(
                 modifier = Modifier
                     .heightIn(max = 420.dp)
@@ -107,15 +104,6 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = extended.textSecondary
                 )
-
-                // Kept right after the description, before the variable-length Updates section
-                // below, so it's always visible on the first screen of the dialog - it previously
-                // sat at the very end of the scrollable content, where it could read as "missing"
-                // if the Updates section pushed it below the fold (nothing here hints a dialog is
-                // scrollable) or on a build predating the scroll fix that cut it off outright.
-                TextButton(onClick = { openUrl(REPO_URL) }) {
-                    Text("View source on GitHub")
-                }
 
                 Box(
                     modifier = Modifier
