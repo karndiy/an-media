@@ -133,8 +133,8 @@ fun AboutDialog(onDismiss: () -> Unit) {
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        TextButton(onClick = { openUrl(s.info.downloadUrl ?: s.info.htmlUrl) }) {
-                            Text("Download update")
+                        TextButton(onClick = { openUrl(s.info.downloadUrl) }) {
+                            Text("Download update (.apk)")
                         }
                     }
 

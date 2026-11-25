@@ -26,11 +26,10 @@ import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-/** A newer release found on GitHub than the one currently installed. */
+/** A newer release found on GitHub than the one currently installed, with an APK to download. */
 data class UpdateInfo(
     val versionName: String,
-    val htmlUrl: String,
-    val downloadUrl: String?,
+    val downloadUrl: String,
     val releaseNotes: String
 )
 
@@ -51,17 +50,17 @@ sealed interface UpdateCheckState {
  *
  * An automatic check runs at most once every [AUTO_CHECK_INTERVAL_MS] (tracked via
  * [PlayerStateRepository.loadUpdateLastCheckedAt]); [checkNow] always runs regardless, for a
- * user-initiated "Check for updates" tap. When a release is newer than any version already
- * notified about ([PlayerStateRepository.loadUpdateLastNotifiedVersion]), a system notification
- * is posted whose tap target is the release page (or the APK asset directly, if one is
- * attached) - there's no in-app installer, so handing off to the browser/download manager is
- * the simplest correct behavior here.
+ * user-initiated "Check for updates" tap. A release only counts as an available update if it has
+ * a `.apk` asset attached - there's no in-app installer, so the only useful action is handing the
+ * APK straight to the browser/download manager; a release with no APK is treated the same as no
+ * release at all. When a release is newer than any version already notified about
+ * ([PlayerStateRepository.loadUpdateLastNotifiedVersion]), a system notification is posted whose
+ * tap target is always that APK's direct download URL - never the release page.
  */
 object UpdateChecker {
 
     private const val REPO = "karndiy/an-media"
     private const val LATEST_RELEASE_URL = "https://api.github.com/repos/$REPO/releases/latest"
-    private const val RELEASES_PAGE_URL = "https://github.com/$REPO/releases/latest"
     private const val CHANNEL_ID = "anmedia_updates_channel"
     private const val NOTIFICATION_ID = 1001
     private val AUTO_CHECK_INTERVAL_MS = TimeUnit.HOURS.toMillis(12)
@@ -149,8 +148,7 @@ object UpdateChecker {
             )
         }
 
-        val targetUrl = info.downloadUrl ?: info.htmlUrl
-        val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
+        val viewIntent = Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl))
         val pendingIntent = PendingIntent.getActivity(
             context,
             0,
@@ -194,11 +192,14 @@ object UpdateChecker {
                 return Result.success(null)
             }
 
+            // No .apk asset attached (e.g. a release cut without the build workflow) means
+            // there's nothing for the user to actually download - don't surface it as "available".
+            val apkUrl = findApkAssetUrl(json) ?: return Result.success(null)
+
             Result.success(
                 UpdateInfo(
                     versionName = remoteVersion,
-                    htmlUrl = json.optString("html_url", RELEASES_PAGE_URL),
-                    downloadUrl = findApkAssetUrl(json),
+                    downloadUrl = apkUrl,
                     releaseNotes = json.optString("body").trim()
                 )
             )
