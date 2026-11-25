@@ -108,6 +108,15 @@ fun AboutDialog(onDismiss: () -> Unit) {
                     color = extended.textSecondary
                 )
 
+                // Kept right after the description, before the variable-length Updates section
+                // below, so it's always visible on the first screen of the dialog - it previously
+                // sat at the very end of the scrollable content, where it could read as "missing"
+                // if the Updates section pushed it below the fold (nothing here hints a dialog is
+                // scrollable) or on a build predating the scroll fix that cut it off outright.
+                TextButton(onClick = { openUrl(REPO_URL) }) {
+                    Text("View source on GitHub")
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -171,10 +180,6 @@ fun AboutDialog(onDismiss: () -> Unit) {
 
                 TextButton(onClick = { UpdateChecker.checkNow() }) {
                     Text(if (updateState is UpdateCheckState.Checking) "Checking..." else "Check for updates")
-                }
-
-                TextButton(onClick = { openUrl(REPO_URL) }) {
-                    Text("View source on GitHub")
                 }
             }
         },
