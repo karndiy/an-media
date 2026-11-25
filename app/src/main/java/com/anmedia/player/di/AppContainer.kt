@@ -9,6 +9,7 @@ import com.anmedia.player.data.repository.PlaylistRepository
 import com.anmedia.player.domain.youtube.YouTubeStreamResolver
 import com.anmedia.player.player.PlayerManager
 import com.anmedia.player.ui.theme.ThemeController
+import com.anmedia.player.update.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,5 +49,6 @@ class AppContainer(context: Context) {
 
     init {
         ThemeController.init(playerStateRepository, appScope)
+        UpdateChecker.init(appContext, playerStateRepository, appScope)
     }
 }

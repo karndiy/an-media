@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
@@ -64,8 +65,11 @@ import com.anmedia.player.ui.components.MarqueeTitle
 import com.anmedia.player.ui.components.PlaybackClock
 import com.anmedia.player.ui.components.SpectrumVisualizerPanel
 import com.anmedia.player.ui.components.VideoSurface
+import com.anmedia.player.ui.screens.common.AboutDialog
 import com.anmedia.player.ui.theme.LocalExtendedColors
 import com.anmedia.player.ui.theme.ThemeController
+import com.anmedia.player.update.UpdateCheckState
+import com.anmedia.player.update.UpdateChecker
 
 /**
  * The whole screen is one [LazyColumn] - including the fixed-looking header content above the
@@ -87,8 +91,10 @@ fun PlayerScreen(
     val waveform by AudioEffectsController.waveform.collectAsStateWithLifecycle()
     val extended = LocalExtendedColors.current
     val themeMode by ThemeController.themeMode.collectAsStateWithLifecycle()
+    val updateState by UpdateChecker.state.collectAsStateWithLifecycle()
     var showThemePicker by remember { mutableStateOf(false) }
     var showDebugLog by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier
@@ -108,6 +114,21 @@ fun PlayerScreen(
                 }
                 IconButton(onClick = { showThemePicker = true }) {
                     Icon(Icons.Filled.Palette, contentDescription = "Change theme", tint = extended.textSecondary)
+                }
+                Box {
+                    IconButton(onClick = { showAbout = true }) {
+                        Icon(Icons.Filled.Info, contentDescription = "About AnMedia", tint = extended.textSecondary)
+                    }
+                    if (updateState is UpdateCheckState.Available) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 6.dp, end = 6.dp)
+                                .size(8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(extended.accent)
+                        )
+                    }
                 }
             }
         }
@@ -322,6 +343,10 @@ fun PlayerScreen(
 
     if (showDebugLog) {
         DebugLogDialog(onDismiss = { showDebugLog = false })
+    }
+
+    if (showAbout) {
+        AboutDialog(onDismiss = { showAbout = false })
     }
 }
 

@@ -22,4 +22,6 @@ object PlayerStateKeys {
     const val VOLUME = "volume"
     const val BALANCE = "balance"
     const val THEME_MODE = "theme_mode"
+    const val UPDATE_LAST_CHECKED_AT = "update_last_checked_at"
+    const val UPDATE_LAST_NOTIFIED_VERSION = "update_last_notified_version"
 }

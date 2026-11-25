@@ -56,6 +56,11 @@ succeeds and produces an installable debug APK) as part of producing this delive
 - ทนทานต่อสัญญาณเน็ตหลุดสั้น ๆ ระหว่างเล่น YouTube (พยายามเชื่อมต่อใหม่อัตโนมัติก่อนจะแจ้งว่าเล่นไม่สำเร็จจริง ๆ)
 - แคชผลการแปลงลิงก์ YouTube เป็นสตรีมจริงไว้ชั่วคราว ทำให้เปิดเพลง/วิดีโอเดิมซ้ำได้เร็วโดยไม่ต้องประมวลผลใหม่ทุกครั้ง
 
+### การอัปเดตแอป และหน้า About
+- หน้า **About** (ไอคอน "i" บนหน้า Player) แสดงชื่อแอป เวอร์ชันปัจจุบัน คำอธิบายสั้น ๆ และลิงก์ไปซอร์สโค้ดบน GitHub
+- แอปตรวจสอบเวอร์ชันใหม่จาก GitHub Releases ของโปรเจกต์โดยอัตโนมัติ (สูงสุดทุก 12 ชั่วโมง) และกดตรวจสอบเองได้ทันทีจากหน้า About
+- เมื่อพบเวอร์ชันใหม่ จะมีจุดสีแจ้งเตือนที่ไอคอน About และมีการแจ้งเตือนระบบ (notification) ขึ้นมา กดเพื่อเปิดหน้าดาวน์โหลดได้ทันที
+
 ## 1. Prerequisites
 
 - **Android Studio** Ladybug (2024.2) or newer.
@@ -95,6 +100,27 @@ On Windows PowerShell use `.\gradlew.bat` instead of `./gradlew`.
 A **release** build (`assembleRelease`) will additionally need a real signing config —
 `app/build.gradle.kts` has an empty `signingConfigs.create("release") { }` placeholder block
 ready for your keystore details before shipping.
+
+### Cutting a release (update channel)
+
+AnMedia is sideloaded, not distributed through the Play Store, so GitHub Releases is the
+actual update channel: `app/src/main/java/com/anmedia/player/update/UpdateChecker.kt` polls
+`GET /repos/karndiy/an-media/releases/latest` and compares its `tag_name` against the
+installed `versionName`, notifying the user (and showing it on the in-app **About** screen)
+when the release is newer.
+
+To publish a new version:
+
+1. Bump `versionCode` / `versionName` in `app/build.gradle.kts`.
+2. Commit, then tag the commit to match the new version and push the tag:
+   ```bash
+   git tag v1.0.15
+   git push origin v1.0.15
+   ```
+3. Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the debug APK
+   and publishes it as a GitHub Release (with the tag's auto-generated notes) — no manual
+   upload needed. Users already running the app get the update notification within 12 hours,
+   or immediately via "Check for updates" on the About screen.
 
 ## 3. Runtime permissions
 

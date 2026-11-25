@@ -1,0 +1,160 @@
+package com.anmedia.player.ui.screens.common
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anmedia.player.BuildConfig
+import com.anmedia.player.R
+import com.anmedia.player.ui.theme.LocalExtendedColors
+import com.anmedia.player.update.UpdateCheckState
+import com.anmedia.player.update.UpdateChecker
+
+private const val REPO_URL = "https://github.com/karndiy/an-media"
+
+@Composable
+fun AboutDialog(onDismiss: () -> Unit) {
+    val extended = LocalExtendedColors.current
+    val context = LocalContext.current
+    val updateState by UpdateChecker.state.collectAsStateWithLifecycle()
+
+    fun openUrl(url: String) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("About AnMedia") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.mipmap.ic_launcher),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    Column {
+                        Text(
+                            text = "AnMedia",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = extended.textPrimary
+                        )
+                        Text(
+                            text = "Version ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = extended.textSecondary
+                        )
+                    }
+                }
+
+                Text(
+                    text = "A Winamp-inspired local + YouTube media player with a 5-band " +
+                        "equalizer, playlists and background playback.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = extended.textSecondary
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(extended.divider)
+                )
+
+                Text(text = "Updates", style = MaterialTheme.typography.labelLarge, color = extended.textPrimary)
+
+                when (val s = updateState) {
+                    is UpdateCheckState.Checking -> Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text(
+                            text = "Checking for updates...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = extended.textSecondary
+                        )
+                    }
+
+                    is UpdateCheckState.Available -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Version ${s.info.versionName} is available",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = extended.accent
+                        )
+                        if (s.info.releaseNotes.isNotBlank()) {
+                            Text(
+                                text = s.info.releaseNotes,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = extended.textSecondary,
+                                maxLines = 6,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        TextButton(onClick = { openUrl(s.info.downloadUrl ?: s.info.htmlUrl) }) {
+                            Text("Download update")
+                        }
+                    }
+
+                    is UpdateCheckState.UpToDate -> Text(
+                        text = "You're on the latest version.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = extended.textSecondary
+                    )
+
+                    is UpdateCheckState.Error -> Text(
+                        text = "Couldn't check for updates: ${s.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = extended.danger
+                    )
+
+                    UpdateCheckState.Idle -> Text(
+                        text = "Not checked yet this session.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = extended.textSecondary
+                    )
+                }
+
+                TextButton(onClick = { UpdateChecker.checkNow() }) {
+                    Text(if (updateState is UpdateCheckState.Checking) "Checking..." else "Check for updates")
+                }
+
+                TextButton(onClick = { openUrl(REPO_URL) }) {
+                    Text("View source on GitHub")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}

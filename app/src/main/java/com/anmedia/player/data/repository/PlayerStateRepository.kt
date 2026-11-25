@@ -77,4 +77,16 @@ class PlayerStateRepository(private val dao: PlayerStateDao) {
 
     private fun PlayerStateEntity?.toThemeMode(): ThemeMode =
         this?.value?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM
+
+    suspend fun saveUpdateLastCheckedAt(epochMillis: Long) =
+        dao.set(PlayerStateEntity(PlayerStateKeys.UPDATE_LAST_CHECKED_AT, epochMillis.toString()))
+
+    suspend fun loadUpdateLastCheckedAt(): Long =
+        dao.get(PlayerStateKeys.UPDATE_LAST_CHECKED_AT)?.value?.toLongOrNull() ?: 0L
+
+    suspend fun saveUpdateLastNotifiedVersion(versionName: String) =
+        dao.set(PlayerStateEntity(PlayerStateKeys.UPDATE_LAST_NOTIFIED_VERSION, versionName))
+
+    suspend fun loadUpdateLastNotifiedVersion(): String? =
+        dao.get(PlayerStateKeys.UPDATE_LAST_NOTIFIED_VERSION)?.value
 }

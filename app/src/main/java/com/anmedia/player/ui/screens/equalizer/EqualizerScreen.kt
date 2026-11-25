@@ -81,7 +81,7 @@ fun EqualizerScreen(viewModel: EqualizerViewModel, modifier: Modifier = Modifier
                 EqBandSlider(
                     label = "PRE",
                     valueDb = state.preampMb / 100f,
-                    onValueChange = { if (state.supported) viewModel.setPreamp((it * 100).toInt()) },
+                    onValueChange = { viewModel.setPreamp((it * 100).toInt()) },
                     valueRange = (state.minLevelMb / 100f)..(state.maxLevelMb / 100f).coerceAtLeast(1f)
                 )
                 state.bands.forEach { band ->
@@ -99,15 +99,14 @@ fun EqualizerScreen(viewModel: EqualizerViewModel, modifier: Modifier = Modifier
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .alpha(if (state.supported) 1f else 0.4f),
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             EqPreset.entries.filter { it != EqPreset.CUSTOM }.forEach { preset ->
                 PresetChip(
                     label = preset.label,
                     selected = state.preset == preset,
-                    onClick = { if (state.supported) viewModel.applyPreset(preset) }
+                    onClick = { viewModel.applyPreset(preset) }
                 )
             }
         }

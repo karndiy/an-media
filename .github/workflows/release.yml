@@ -1,0 +1,46 @@
+name: Release
+
+# Publishes a GitHub Release with the built APK attached whenever a vX.Y.Z tag is pushed.
+# This is AnMedia's actual update channel: the in-app UpdateChecker
+# (app/src/main/java/com/anmedia/player/update/UpdateChecker.kt) polls
+# https://api.github.com/repos/<repo>/releases/latest for a newer tag than the
+# installed versionName, and points its update notification at this release.
+#
+# Builds the debug variant: there's no release signing config yet
+# (see app/build.gradle.kts' empty signingConfigs.release block), and the debug
+# build is what's actually been installed/tested throughout this project so far.
+# Once a real release keystore is added, switch this to assembleRelease.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AnMedia ${{ github.ref_name }}
+          generate_release_notes: true
+          files: app/build/outputs/apk/debug/*.apk
