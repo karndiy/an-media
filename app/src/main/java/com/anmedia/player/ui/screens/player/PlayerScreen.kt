@@ -66,6 +66,9 @@ import com.anmedia.player.data.local.entity.MediaItemEntity
 import com.anmedia.player.domain.model.RepeatMode
 import com.anmedia.player.domain.model.ThemeMode
 import com.anmedia.player.player.AudioEffectsController
+import com.anmedia.player.player.StereoBalanceController
+import com.anmedia.player.player.VocalMode
+import com.anmedia.player.ui.components.SegmentedControl
 import com.anmedia.player.ui.components.AppSlider
 import com.anmedia.player.ui.components.IconCircleButton
 import com.anmedia.player.ui.components.IconToggleButton
@@ -100,6 +103,7 @@ fun PlayerScreen(
     val extended = LocalExtendedColors.current
     val themeMode by ThemeController.themeMode.collectAsStateWithLifecycle()
     val updateState by UpdateChecker.state.collectAsStateWithLifecycle()
+    val vocalMode by StereoBalanceController.vocalMode.collectAsStateWithLifecycle()
     var showThemePicker by remember { mutableStateOf(false) }
     var showDebugLog by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
@@ -322,7 +326,12 @@ fun PlayerScreen(
                 )
             }
             IconButton(onClick = { showSound = true }) {
-                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume and balance", tint = extended.textSecondary)
+                // Accent tint while a vocal mode is on, so it's obvious the audio is being altered.
+                Icon(
+                    Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = "Volume, balance and vocals",
+                    tint = if (vocalMode != VocalMode.NORMAL) extended.accent else extended.textSecondary
+                )
             }
         }
     }
@@ -399,6 +408,23 @@ fun PlayerScreen(
                     value = state.balance,
                     onValueChange = viewModel::setBalance,
                     valueRange = -1f..1f
+                )
+                Text(
+                    text = "Vocals / Music",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = extended.textSecondary,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                SegmentedControl(
+                    options = VocalMode.entries.map { it.label },
+                    selectedIndex = vocalMode.ordinal,
+                    onSelect = { StereoBalanceController.setVocalMode(VocalMode.entries[it]) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Works best on stereo songs with the vocal in the centre.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = extended.textTertiary
                 )
             }
         }
