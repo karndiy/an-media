@@ -26,15 +26,7 @@ class YouTubeStreamResolver {
 
     private val cache = ConcurrentHashMap<String, ResolvedYoutubeStream>()
 
-    private fun ensureInitialized() {
-        if (initialized.compareAndSet(false, true)) {
-            NewPipe.init(
-                NewPipeDownloader.getInstance(),
-                Localization.fromLocale(Locale.getDefault()),
-                ContentCountry(Locale.getDefault().country.ifBlank { "US" })
-            )
-        }
-    }
+    private fun ensureInitialized() = ensureNewPipeInitialized()
 
     /**
      * Synchronous, zero-I/O lookup into the in-memory resolution cache - safe to call from the
@@ -254,5 +246,16 @@ class YouTubeStreamResolver {
         private const val MAX_PLAYLIST_ITEMS = 200
         private const val MAX_SAFE_VIDEO_HEIGHT = 720
         private val initialized = AtomicBoolean(false)
+
+        /** Initialises NewPipe once per process; safe to call from any thread. */
+        fun ensureNewPipeInitialized() {
+            if (initialized.compareAndSet(false, true)) {
+                NewPipe.init(
+                    NewPipeDownloader.getInstance(),
+                    Localization.fromLocale(Locale.getDefault()),
+                    ContentCountry(Locale.getDefault().country.ifBlank { "US" })
+                )
+            }
+        }
     }
 }

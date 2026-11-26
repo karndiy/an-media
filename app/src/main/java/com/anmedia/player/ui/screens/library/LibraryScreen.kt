@@ -1,5 +1,11 @@
 package com.anmedia.player.ui.screens.library
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,17 +43,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.anmedia.player.AnMediaApp
 import com.anmedia.player.data.local.entity.MediaItemEntity
 import com.anmedia.player.data.local.entity.PlaylistEntity
+import com.anmedia.player.domain.youtube.DownloadFormat
 import com.anmedia.player.domain.youtube.YoutubeSearchResult
 import com.anmedia.player.ui.components.AppSearchField
 import com.anmedia.player.ui.components.ReorderableList
 import com.anmedia.player.ui.components.SegmentedControl
 import com.anmedia.player.ui.components.formatTime
 import com.anmedia.player.ui.screens.youtube.AddYoutubeUrlDialog
+import com.anmedia.player.ui.screens.youtube.DownloadOptionsDialog
 import com.anmedia.player.ui.theme.LocalExtendedColors
 
 private val TAB_TITLES = listOf("Local", "Video", "Playlists", "YouTube")
@@ -59,6 +71,36 @@ fun LibraryScreen(viewModel: LibraryViewModel, modifier: Modifier = Modifier) {
     var addToPlaylistTarget by remember { mutableStateOf<MediaItemEntity?>(null) }
     var pendingDeleteYoutubeItem by remember { mutableStateOf<MediaItemEntity?>(null) }
     var pendingSearchResultModePick by remember { mutableStateOf<YoutubeSearchResult?>(null) }
+    // (url, title) of the video whose download-format picker is open.
+    var pendingDownload by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val context = LocalContext.current
+    val downloader = remember(context) {
+        (context.applicationContext as AnMediaApp).container.youtubeMediaDownloader
+    }
+    // Android 8-9 need WRITE_EXTERNAL_STORAGE to save into Music/Movies; 10+ use MediaStore.
+    var queuedDownload by remember { mutableStateOf<Triple<String, String, DownloadFormat>?>(null) }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val job = queuedDownload
+        queuedDownload = null
+        if (granted && job != null) {
+            downloader.download(job.first, job.second, job.third)
+        } else if (job != null) {
+            Toast.makeText(context, "Storage permission is needed to save downloads", Toast.LENGTH_LONG).show()
+        }
+    }
+    fun startDownload(url: String, title: String, format: DownloadFormat) {
+        val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        if (needsPermission) {
+            queuedDownload = Triple(url, title, format)
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            downloader.download(url, title, format)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         SegmentedControl(
@@ -88,9 +130,18 @@ fun LibraryScreen(viewModel: LibraryViewModel, modifier: Modifier = Modifier) {
                 onAddClicked = { showAddYoutubeDialog = true },
                 onAddToPlaylist = { addToPlaylistTarget = it },
                 onDeleteItem = { pendingDeleteYoutubeItem = it },
-                onSearchResultAddToPlaylist = { pendingSearchResultModePick = it }
+                onSearchResultAddToPlaylist = { pendingSearchResultModePick = it },
+                onDownload = { url, title -> pendingDownload = url to title }
             )
         }
+    }
+
+    pendingDownload?.let { (url, title) ->
+        DownloadOptionsDialog(
+            videoTitle = title,
+            onDismiss = { pendingDownload = null },
+            onConfirm = { format -> startDownload(url, title, format) }
+        )
     }
 
     if (showAddYoutubeDialog) {
@@ -181,7 +232,8 @@ private fun YoutubeTab(
     onAddClicked: () -> Unit,
     onAddToPlaylist: (MediaItemEntity) -> Unit,
     onDeleteItem: (MediaItemEntity) -> Unit,
-    onSearchResultAddToPlaylist: (YoutubeSearchResult) -> Unit
+    onSearchResultAddToPlaylist: (YoutubeSearchResult) -> Unit,
+    onDownload: (url: String, title: String) -> Unit
 ) {
     val extended = LocalExtendedColors.current
     val items by viewModel.youtubeQueue.collectAsStateWithLifecycle()
@@ -242,7 +294,8 @@ private fun YoutubeTab(
                         result = result,
                         isResolving = resolvingUrl == result.url,
                         onClick = { viewModel.playYoutubeSearchResult(result) },
-                        onAddToPlaylist = { onSearchResultAddToPlaylist(result) }
+                        onAddToPlaylist = { onSearchResultAddToPlaylist(result) },
+                        onDownload = { onDownload(result.url, result.title) }
                     )
                 }
             }
@@ -272,7 +325,8 @@ private fun YoutubeTab(
                     entity = entity,
                     onClick = { viewModel.playYoutubeQueueFrom(entity) },
                     onAddToPlaylist = { onAddToPlaylist(entity) },
-                    onDelete = { onDeleteItem(entity) }
+                    onDelete = { onDeleteItem(entity) },
+                    onDownload = { onDownload(entity.sourceUri, entity.title) }
                 )
             }
         }
@@ -284,7 +338,8 @@ private fun YoutubeSearchResultRow(
     result: YoutubeSearchResult,
     isResolving: Boolean,
     onClick: () -> Unit,
-    onAddToPlaylist: () -> Unit
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit
 ) {
     val extended = LocalExtendedColors.current
     Row(
@@ -330,6 +385,9 @@ private fun YoutubeSearchResultRow(
                 strokeWidth = 2.dp
             )
         } else {
+            IconButton(onClick = onDownload) {
+                Icon(Icons.Filled.Download, contentDescription = "Download", tint = extended.textSecondary)
+            }
             IconButton(onClick = onAddToPlaylist) {
                 Icon(
                     Icons.AutoMirrored.Filled.PlaylistAdd,
@@ -470,7 +528,8 @@ private fun MediaRow(
     entity: MediaItemEntity,
     onClick: () -> Unit,
     onAddToPlaylist: () -> Unit,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    onDownload: (() -> Unit)? = null
 ) {
     val extended = LocalExtendedColors.current
     Row(
@@ -507,6 +566,11 @@ private fun MediaRow(
                 color = extended.textSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+        if (onDownload != null) {
+            IconButton(onClick = onDownload) {
+                Icon(Icons.Filled.Download, contentDescription = "Download", tint = extended.textSecondary)
+            }
         }
         IconButton(onClick = onAddToPlaylist) {
             Icon(

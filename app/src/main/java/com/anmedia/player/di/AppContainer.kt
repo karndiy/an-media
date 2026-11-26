@@ -7,6 +7,7 @@ import com.anmedia.player.data.repository.MediaRepository
 import com.anmedia.player.data.repository.PlayerStateRepository
 import com.anmedia.player.data.repository.PlaylistRepository
 import com.anmedia.player.domain.youtube.YouTubeStreamResolver
+import com.anmedia.player.domain.youtube.YoutubeMediaDownloader
 import com.anmedia.player.player.PlayerManager
 import com.anmedia.player.ui.theme.ThemeController
 import com.anmedia.player.update.UpdateChecker
@@ -42,6 +43,11 @@ class AppContainer(context: Context) {
     }
 
     val youTubeStreamResolver: YouTubeStreamResolver by lazy { YouTubeStreamResolver() }
+
+    val youtubeMediaDownloader: YoutubeMediaDownloader by lazy {
+        // Rescan after each saved file so it shows up in the Local / Video tabs straight away.
+        YoutubeMediaDownloader(appContext, appScope, onSaved = { mediaRepository.rescanLocalLibrary() })
+    }
 
     val playerManager: PlayerManager by lazy {
         PlayerManager(appContext, mediaRepository, playerStateRepository, appScope)
