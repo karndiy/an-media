@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,12 +16,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
@@ -30,14 +35,18 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,13 +67,12 @@ import com.anmedia.player.domain.model.RepeatMode
 import com.anmedia.player.domain.model.ThemeMode
 import com.anmedia.player.player.AudioEffectsController
 import com.anmedia.player.ui.components.AppSlider
-import com.anmedia.player.ui.components.BevelPanel
 import com.anmedia.player.ui.components.IconCircleButton
 import com.anmedia.player.ui.components.IconToggleButton
 import com.anmedia.player.ui.components.MarqueeTitle
-import com.anmedia.player.ui.components.PlaybackClock
 import com.anmedia.player.ui.components.SpectrumVisualizerPanel
 import com.anmedia.player.ui.components.VideoSurface
+import com.anmedia.player.ui.components.formatTime
 import com.anmedia.player.ui.screens.common.AboutDialog
 import com.anmedia.player.ui.theme.LocalExtendedColors
 import com.anmedia.player.ui.theme.ThemeController
@@ -72,12 +80,12 @@ import com.anmedia.player.update.UpdateCheckState
 import com.anmedia.player.update.UpdateChecker
 
 /**
- * The whole screen is one [LazyColumn] - including the fixed-looking header content above the
- * playlist - rather than a [Column] with a `weight(1f)` playlist panel. A weighted child only
- * ever gets *leftover* space after its siblings, which on a small screen (or just a long error
- * message) can squeeze it to zero height with no way to reach it; a single scrollable list has
- * no such failure mode on any screen size, and keeps LazyColumn's recycling for long queues.
+ * Now Playing layout: the transport controls are always on screen. The artwork box takes
+ * whatever height is left (`weight(1f)`) and shrinks on small screens, so the controls are never
+ * pushed off-screen. The queue lives in a bottom sheet, and volume/balance live in a second
+ * sheet, so neither competes with the player for space.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
@@ -95,50 +103,76 @@ fun PlayerScreen(
     var showThemePicker by remember { mutableStateOf(false) }
     var showDebugLog by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
+    var showSound by remember { mutableStateOf(false) }
 
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                IconButton(onClick = { showDebugLog = true }) {
-                    Icon(Icons.Filled.BugReport, contentDescription = "Debug log", tint = extended.textSecondary)
+        // Top bar: one overflow menu instead of three separate icons.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Now Playing",
+                style = MaterialTheme.typography.titleSmall,
+                color = extended.textSecondary,
+                modifier = Modifier.weight(1f)
+            )
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "More options", tint = extended.textSecondary)
                 }
-                IconButton(onClick = { showThemePicker = true }) {
-                    Icon(Icons.Filled.Palette, contentDescription = "Change theme", tint = extended.textSecondary)
+                if (updateState is UpdateCheckState.Available) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 8.dp)
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(extended.accent)
+                    )
                 }
-                Box {
-                    IconButton(onClick = { showAbout = true }) {
-                        Icon(Icons.Filled.Info, contentDescription = "About AnMedia", tint = extended.textSecondary)
-                    }
-                    if (updateState is UpdateCheckState.Available) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 6.dp, end = 6.dp)
-                                .size(8.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(extended.accent)
-                        )
-                    }
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Theme") },
+                        leadingIcon = { Icon(Icons.Filled.Palette, contentDescription = null) },
+                        onClick = { showMenu = false; showThemePicker = true }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(if (updateState is UpdateCheckState.Available) "About (update available)" else "About")
+                        },
+                        leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                        onClick = { showMenu = false; showAbout = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Debug log") },
+                        leadingIcon = { Icon(Icons.Filled.BugReport, contentDescription = null) },
+                        onClick = { showMenu = false; showDebugLog = true }
+                    )
                 }
             }
         }
 
-        item {
+        // Artwork / video: fills the leftover height, keeping its aspect ratio.
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(14.dp))
+                    .aspectRatio(if (state.hasVideo) 16f / 9f else 1f)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(extended.surfaceSunken)
             ) {
                 when {
@@ -155,179 +189,219 @@ fun PlayerScreen(
                         tint = extended.textTertiary,
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .size(48.dp)
+                            .size(64.dp)
                     )
                 }
             }
         }
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MarqueeTitle(
-                    text = state.title,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp)
-                )
-                PlaybackClock(positionMs = state.positionMs, durationMs = state.durationMs)
-            }
+        MarqueeTitle(text = state.title, color = extended.textPrimary)
+        if (state.artist.isNotBlank()) {
+            Text(
+                text = state.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = extended.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         state.errorMessage?.let { message ->
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(extended.danger.copy(alpha = 0.12f))
-                        .padding(start = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = extended.danger,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = viewModel::dismissError) {
-                        Icon(Icons.Filled.Close, contentDescription = "Dismiss error", tint = extended.danger)
-                    }
-                }
-            }
-        }
-
-        item {
-            SpectrumVisualizerPanel(
-                spectrum = spectrum,
-                waveform = waveform,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp)
-            )
-        }
-
-        item {
-            SeekBar(
-                positionMs = state.positionMs,
-                durationMs = state.durationMs,
-                onSeek = viewModel::seekTo,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 8.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(extended.danger.copy(alpha = 0.12f))
+                    .padding(start = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconToggleButton(
-                    icon = Icons.Filled.Shuffle,
-                    contentDescription = "Shuffle",
-                    active = state.shuffleEnabled,
-                    onClick = viewModel::toggleShuffle
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = extended.danger,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                IconCircleButton(
-                    icon = Icons.Filled.SkipPrevious,
-                    contentDescription = "Previous",
-                    onClick = viewModel::skipToPrevious
-                )
-                IconCircleButton(
-                    icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Play/Pause",
-                    size = 56.dp,
-                    filled = true,
-                    onClick = viewModel::playPause
-                )
-                IconCircleButton(
-                    icon = Icons.Filled.Stop,
-                    contentDescription = "Stop",
-                    onClick = viewModel::stop
-                )
-                IconCircleButton(
-                    icon = Icons.Filled.SkipNext,
-                    contentDescription = "Next",
-                    onClick = viewModel::skipToNext
-                )
-                IconToggleButton(
-                    icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                    contentDescription = "Repeat",
-                    active = state.repeatMode != RepeatMode.OFF,
-                    onClick = viewModel::cycleRepeatMode
-                )
-            }
-        }
-
-        item {
-            BevelPanel(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Volume", style = MaterialTheme.typography.labelLarge, color = extended.textSecondary)
-                    AppSlider(
-                        value = state.volume,
-                        onValueChange = viewModel::setVolume,
-                        valueRange = 0f..1f
-                    )
-                    Text(text = "Balance", style = MaterialTheme.typography.labelLarge, color = extended.textSecondary)
-                    AppSlider(
-                        value = state.balance,
-                        onValueChange = viewModel::setBalance,
-                        valueRange = -1f..1f
-                    )
+                IconButton(onClick = viewModel::dismissError) {
+                    Icon(Icons.Filled.Close, contentDescription = "Dismiss error", tint = extended.danger)
                 }
             }
         }
 
-        item {
+        SpectrumVisualizerPanel(
+            spectrum = spectrum,
+            waveform = waveform,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+                .height(56.dp)
+        )
+
+        SeekBar(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            onSeek = viewModel::seekTo,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = formatTime(state.positionMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = extended.textSecondary
+            )
+            Text(
+                text = formatTime(state.durationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = extended.textSecondary
+            )
+        }
+
+        // Transport: Stop removed (Pause covers it), bigger Play button.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconToggleButton(
+                icon = Icons.Filled.Shuffle,
+                contentDescription = "Shuffle",
+                active = state.shuffleEnabled,
+                onClick = viewModel::toggleShuffle
+            )
+            IconCircleButton(
+                icon = Icons.Filled.SkipPrevious,
+                contentDescription = "Previous",
+                size = 52.dp,
+                onClick = viewModel::skipToPrevious
+            )
+            IconCircleButton(
+                icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = "Play/Pause",
+                size = 68.dp,
+                filled = true,
+                onClick = viewModel::playPause
+            )
+            IconCircleButton(
+                icon = Icons.Filled.SkipNext,
+                contentDescription = "Next",
+                size = 52.dp,
+                onClick = viewModel::skipToNext
+            )
+            IconToggleButton(
+                icon = if (state.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                contentDescription = "Repeat",
+                active = state.repeatMode != RepeatMode.OFF,
+                onClick = viewModel::cycleRepeatMode
+            )
+        }
+
+        // Bottom actions: open the queue sheet / the volume & balance sheet.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = { showQueue = true }) {
+                Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null, tint = extended.accent)
+                Text(
+                    text = "Playlist (${queue.size})",
+                    color = extended.textPrimary,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            IconButton(onClick = { showSound = true }) {
+                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume and balance", tint = extended.textSecondary)
+            }
+        }
+    }
+
+    if (showQueue) {
+        ModalBottomSheet(
+            onDismissRequest = { showQueue = false },
+            sheetState = rememberModalBottomSheetState()
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 2.dp),
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Playlist", style = MaterialTheme.typography.titleSmall, color = extended.textPrimary)
-                IconButton(onClick = onNavigateToLibrary) {
+                Text(
+                    text = "Playlist (${queue.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = extended.textPrimary
+                )
+                IconButton(onClick = { showQueue = false; onNavigateToLibrary() }) {
                     Icon(Icons.Filled.Add, contentDescription = "Add to playlist", tint = extended.accent)
                 }
             }
-        }
-
-        if (queue.isEmpty()) {
-            item {
-                BevelPanel(modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Queue is empty. Add tracks from the Library tab.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = extended.textTertiary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
-                    }
+            if (queue.isEmpty()) {
+                Text(
+                    text = "Queue is empty. Add tracks from the Library tab.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = extended.textTertiary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 40.dp)
+                )
+            } else {
+                val listState = rememberLazyListState(
+                    initialFirstVisibleItemIndex = state.currentIndex.coerceIn(0, queue.lastIndex)
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    playlistItems(
+                        queue = queue,
+                        currentIndex = state.currentIndex,
+                        onPlay = viewModel::playQueueIndex,
+                        onRemove = viewModel::removeFromQueue
+                    )
                 }
             }
-        } else {
-            playlistItems(
-                queue = queue,
-                currentIndex = state.currentIndex,
-                onPlay = viewModel::playQueueIndex,
-                onRemove = viewModel::removeFromQueue
-            )
         }
+    }
 
-        item { Box(modifier = Modifier.height(12.dp)) }
+    if (showSound) {
+        ModalBottomSheet(
+            onDismissRequest = { showSound = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(text = "Volume", style = MaterialTheme.typography.labelLarge, color = extended.textSecondary)
+                AppSlider(
+                    value = state.volume,
+                    onValueChange = viewModel::setVolume,
+                    valueRange = 0f..1f
+                )
+                Text(text = "Balance", style = MaterialTheme.typography.labelLarge, color = extended.textSecondary)
+                AppSlider(
+                    value = state.balance,
+                    onValueChange = viewModel::setBalance,
+                    valueRange = -1f..1f
+                )
+            }
+        }
     }
 
     if (showThemePicker) {
