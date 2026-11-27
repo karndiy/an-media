@@ -40,11 +40,24 @@ fun AnMediaNavHost(
     val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     var isVideoFullscreen by remember { mutableStateOf(false) }
+    // True when fullscreen was opened from the Player screen, so exiting returns there.
+    var fullscreenFromPlayer by remember { mutableStateOf(false) }
+
+    fun navigateTo(route: String) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     // Leaving the Video tab should always drop fullscreen, so the bottom nav and system
     // bars come back even if the user navigated away without using the exit button.
     LaunchedEffect(currentRoute) {
-        if (currentRoute != Destination.Video.route) isVideoFullscreen = false
+        if (currentRoute != Destination.Video.route) {
+            isVideoFullscreen = false
+            fullscreenFromPlayer = false
+        }
     }
 
     Scaffold(
@@ -78,12 +91,11 @@ fun AnMediaNavHost(
             composable(Destination.Player.route) {
                 PlayerScreen(
                     viewModel = playerViewModel,
-                    onNavigateToLibrary = {
-                        navController.navigate(Destination.Library.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                    onNavigateToLibrary = { navigateTo(Destination.Library.route) },
+                    onEnterFullscreen = {
+                        fullscreenFromPlayer = true
+                        isVideoFullscreen = true
+                        navigateTo(Destination.Video.route)
                     }
                 )
             }
@@ -99,7 +111,13 @@ fun AnMediaNavHost(
                 VideoPlayerScreen(
                     viewModel = playerViewModel,
                     isFullscreen = isVideoFullscreen,
-                    onFullscreenChange = { isVideoFullscreen = it }
+                    onFullscreenChange = { fullscreen ->
+                        isVideoFullscreen = fullscreen
+                        if (!fullscreen && fullscreenFromPlayer) {
+                            fullscreenFromPlayer = false
+                            navigateTo(Destination.Player.route)
+                        }
+                    }
                 )
             }
         }

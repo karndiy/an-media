@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -55,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -93,7 +95,8 @@ import com.anmedia.player.update.UpdateChecker
 fun PlayerScreen(
     viewModel: PlayerViewModel,
     modifier: Modifier = Modifier,
-    onNavigateToLibrary: () -> Unit = {}
+    onNavigateToLibrary: () -> Unit = {},
+    onEnterFullscreen: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val queue by viewModel.queue.collectAsStateWithLifecycle()
@@ -180,7 +183,32 @@ fun PlayerScreen(
                     .background(extended.surfaceSunken)
             ) {
                 when {
-                    state.hasVideo -> VideoSurface(player = player, useController = false, modifier = Modifier.fillMaxSize())
+                    state.hasVideo -> {
+                        VideoSurface(player = player, useController = false, modifier = Modifier.fillMaxSize())
+                        // Transparent layer on top: the video view would otherwise eat the tap.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable(onClick = onEnterFullscreen)
+                        )
+                        IconButton(
+                            onClick = onEnterFullscreen,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Fullscreen,
+                                contentDescription = "Fullscreen",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.Black.copy(alpha = 0.4f))
+                                    .padding(4.dp)
+                                    .size(24.dp)
+                            )
+                        }
+                    }
                     state.artworkUri != null -> AsyncImage(
                         model = state.artworkUri,
                         contentDescription = "Artwork",
