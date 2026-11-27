@@ -42,9 +42,12 @@ interface MediaItemDao {
     @Query("UPDATE media_items SET preferred_stream_mode = :mode WHERE id = :id")
     suspend fun updateStreamMode(id: Long, mode: com.anmedia.player.domain.model.StreamMode)
 
-    @Query("DELETE FROM media_items WHERE source_type = 'LOCAL_AUDIO' OR source_type = 'LOCAL_VIDEO'")
-    suspend fun clearLocalMedia()
+    @Query("SELECT * FROM media_items WHERE source_type = 'LOCAL_AUDIO' OR source_type = 'LOCAL_VIDEO'")
+    suspend fun getAllLocalMedia(): List<MediaItemEntity>
 
     @Query("DELETE FROM media_items WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM media_items WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 }

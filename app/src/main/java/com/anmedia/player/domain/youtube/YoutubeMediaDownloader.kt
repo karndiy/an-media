@@ -41,7 +41,12 @@ sealed class DownloadFormat(val label: String) {
     data class VideoMp4(val maxHeight: Int) : DownloadFormat("Video MP4 ${maxHeight}p")
 
     companion object {
-        val ALL: List<DownloadFormat> = listOf(AudioM4a, VideoMp4(360), VideoMp4(720), VideoMp4(1080))
+        // `by lazy`, not an eager `val`: building this list touches AudioM4a's singleton
+        // instance from within DownloadFormat's own static initializer (AudioM4a extends
+        // DownloadFormat), and on ART that circular self-reference reads AudioM4a back as
+        // null. Deferring construction until first access runs it after DownloadFormat is
+        // fully initialized, so the reference is no longer circular.
+        val ALL: List<DownloadFormat> by lazy { listOf(AudioM4a, VideoMp4(360), VideoMp4(720), VideoMp4(1080)) }
     }
 }
 
